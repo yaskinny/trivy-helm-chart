@@ -1,0 +1,20 @@
+# if your internet is slow or probe fails before completing download Trivy database
+# turn of Trivy probes with setting:
+# --set deployment.trivy.livenessProbe="false" --set deployment.trivy.readinessProbe="false" 
+
+# if you have trivy CLI installed on your host
+
+  # wait until trivy becomes ready, it depends on your internet
+  kubectl wait po -l app.kubernetes.io/name=trivy --for condition=available --timeout 2m
+
+  # save token
+  export token="$(kubectl get secret {{ .Release.Name }}-trivy -n {{ .Release.Namespace }} -o jsonpath='{.data.TRIVY_TOKEN}' | base64 -d )"
+
+  # save token header name
+  export header="$(kubectl get secret {{ .Release.Name }}-trivy -n {{ .Release.Namespace }} -o jsonpath='{.data.TRIVY_TOKEN_HEADER}' | base64 -d )"
+
+  # forward port
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-trivy {{ .Values.deployment.trivy.service.port }}:{{ .Values.deployment.trivy.service.port }} &
+
+  # test trivy
+  trivy client --token "${token}" --token-header "${header}" --remote "http://localhost:{{ .Values.deployment.trivy.service.port }}" yaskinny/trivy:{{ .Chart.AppVersion }}

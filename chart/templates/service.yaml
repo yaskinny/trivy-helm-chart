@@ -1,0 +1,31 @@
+{{- $trivy := .Values.deployment.trivy.service -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}-trivy
+  {{- with .Values.labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ default "ClusterIP" $trivy.type }}
+  selector:
+    {{- with .Values.deployment.selectorLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- include "trivy.commonLabels" .| nindent 4}}
+  ports:
+  - port: {{ default 4954 $trivy.port }}
+    targetPort: api
+    name: api
+    protocol: TCP
+  {{- if and (eq $trivy.type "NodePort") $trivy.nodePort  }}
+    nodePort: $trivy.nodePort
+  {{- end }}
+...

@@ -1,0 +1,59 @@
+{{- if and (.Capabilities.APIVersions.Has "cilium.io/v2") .Values.networkPolicy.enable -}}
+{{- $np := .Values.networkPolicy.enable -}}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: trivy
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: trivy
+    {{- with .Values.deployment.selectorLabels }}
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- include "trivy.commonLabels" .| nindent 6 }}
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        {{- if .Values.deployment.trivy.ingress.enable }}
+        k8s:io.kubernetes.pod.namespace: "{{ .Values.deployment.trivy.ingress.ingressClassName }}"
+        {{- with $np.extraLabelsForIngress }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- end }}
+    toPorts:
+    - ports:
+      - port: {{ default 4954 .Values.deployment.trivy.service.port  | quote}}
+        protocol: TCP
+  - fromCIDR:
+    - 127.0.0.1/8
+    toPorts:
+    - ports: 
+      - port: "6379"
+        protocol: TCP
+  egress:
+  - toPorts:
+    - ports: 
+      - port: "53"
+        protocol: ANY
+      rules:
+        dns:
+        - matchName: "github.com"
+        - matchName: "ghcr.io"
+        - matchName: "pkg-containers.githubusercontent.com"
+  - toFQDNs:
+    - matchName: "github.com"
+    - matchName: "ghcr.io"
+    - matchName: "pkg-containers.githubusercontent.com"
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      - port: "443"
+        protocol: TCP
+  - toFQDNs:
+    - matchName: "localhost"
+...
+{{- end }}

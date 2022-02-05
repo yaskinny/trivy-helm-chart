@@ -1,0 +1,89 @@
+---
+# global lables
+labels: {}
+
+# global annotations
+annotations: {}
+
+serviceAccountName: trivy
+
+imagePullSecrets: []
+# - secret-name
+
+deployment:
+  replicas: 1
+  # labels to add for matchLabels
+  selectorLabels: {}
+  strategy:
+    type: RollingUpdate
+    maxSurge: 1
+    maxUnavailable: 0
+
+  redis:
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 50m
+      limits:
+        memory: 512Mi
+        cpu: 100m
+    config: |-
+      protected-mode yes 
+      port 6379
+      save ""
+    securityContext:
+      privileged: false
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      readOnlyRootFilesystem: true
+      runAsUser: 999
+      runAsGroup: 999
+      capabilities:
+        drop:
+        - ALL
+    livenessProbe: true
+    readinessProbe: true
+    image: redis:bullseye@sha256:0d9c9aed1eb385336db0bc9b976b6b49774aee3d2b9c2788a0d0d9e239986cb3
+
+  trivy:
+    ingress:
+      enabled: true
+      tls:
+        enable: false
+        secretName: trivy-tls
+      ingressClassName: nginx
+      annotations: {}
+      labels: {}
+      host: trivy.yaser.linux
+    service:
+      port: 4954
+      type: ClusterIP
+      #type: NodePort
+      #nodePort: 300025
+
+    #token: secret123
+    #tokenName: x-token
+    image: yaskinny/trivy:0.23.0@sha256:e5daab9097ca3fdd3c4123a747571c6d78e77988ff76bfa585f2326564194e12
+    securityContext:
+      privileged: false
+      allowPrivilegeEscalation: false
+      runAsUser: 9000
+      runAsGroup: 9000
+      runAsNonRoot: true
+      capabilities:
+        drop:
+        - ALL
+    livenessProbe: true
+    readinessProbe: true
+    resources:
+      requests:
+        memory: 250Mi
+        cpu: 150m
+      limits:
+        memory: 512Mi
+        cpu: 350m
+networkPolicy:
+  enable: true
+  extraLabelsForIngress:
+    app.kubernetes.io/component: controller
+...

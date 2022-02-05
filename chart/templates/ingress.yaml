@@ -1,0 +1,49 @@
+{{- if and (.Capabilities.APIVersions.Has "networking.k8s.io/v1") .Values.deployment.trivy.ingress.enabled -}}
+{{- $trivy := .Values.deployment.trivy.ingress -}}
+{{- if $trivy.host }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}-trivy
+  {{- if or .Values.labels $trivy.labels }}
+  labels:
+  {{- with .Values.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $trivy.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- if or .Values.annotations $trivy.annotations }}
+  annotations:
+  {{- with .Values.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $trivy.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+spec:
+  ingressClassName: {{ required "You have to specify your ingress class name" $trivy.ingressClassName }}
+  {{- if $trivy.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ $trivy.host }}
+    secretName: {{ default (printf "%s-trivy-tls" .Release.Name) $trivy.secretName }}
+  {{- end }}
+  rules:
+  - host: {{ $trivy.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Release.Name }}-trivy
+            port:
+              number: {{ default 4954 .Values.deployment.trivy.service.port }} 
+...
+{{- end }} 
+{{- end }}

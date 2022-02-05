@@ -1,0 +1,14 @@
+---
+apiVersion: v2
+version: "0.1.0"
+appVersion: "0.23.0"
+name: trivy
+maintainers:
+- name: yaser
+  email: yaserkalali.work@gmail.com
+type: application
+description: |-
+  This chart deploys Trivy with redis as a side container.
+  Redis container is on readonly mode and using only memory.
+  Trivy DB or Redis data is not persistent with this Chart.
+...

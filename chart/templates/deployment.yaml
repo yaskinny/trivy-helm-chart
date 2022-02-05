@@ -1,0 +1,160 @@
+{{- $trivy := .Values.deployment.trivy -}}
+{{- $redis := .Values.deployment.redis -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}-trivy
+  {{- with .Values.labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.annotations }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ default 1 .Values.deployment.replicas }}
+  selector:
+    matchLabels:
+    {{- with .Values.deployment.selectorLabels }}
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- include "trivy.commonLabels" .| nindent 6}}
+  strategy:
+  {{- if .Values.deployment.strategy }}
+  {{- if eq .Values.deployment.strategy.type "RollingUpdate" }}
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ default 1 .Values.deployment.strategy.maxSurge }}
+      maxUnavailable: {{ default 0 .Values.deployment.strategy.maxUnavailable }}
+  {{- end }}
+  {{- else if or (eq .Values.deployment.strategy.type "Recreate") (not .Values.deployment.strategy)  }}
+    type: Recreate
+  {{- end}}
+  template:
+    metadata:
+      labels:
+      {{- with .Values.deployment.selectorLabels }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- include "trivy.commonLabels" .| nindent 8}}
+      {{- with .Values.labels }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      {{- if .Values.imagePullSecrets }}
+      {{- range .Values.imagePullSecrets }}
+      imagePullSecrets:
+      - name: {{ . | quote }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - name: trivy
+        image: {{ required "Trivy image is not set" $trivy.image }}
+        command:
+        - /trivy
+        args:
+        - server
+        envFrom:
+        - configMapRef:
+            name: {{ .Release.Name }}-trivy
+        - secretRef:
+            name: {{ .Release.Name }}-trivy
+        ports:
+        - name: api
+          containerPort: {{ default 4954 $trivy.service.port }}
+        {{- if $trivy.readinessProbe }}
+        readinessProbe:
+          httpGet:
+            port: api
+            path: /healthz
+            scheme: HTTP
+          initialDelaySeconds: 20
+          periodSeconds: 8
+          successThreshold: 1
+          failureThreshold: 10
+        {{- end }}
+        {{- if $trivy.livenessProbe }}
+        livenessProbe:
+          httpGet:
+            port: api
+            path: /healthz
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 60
+          successThreshold: 1
+          failureThreshold: 3
+        {{- end }}
+        {{-  with $trivy.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        resources:
+          requests:
+            memory: {{ default "250Mi" $trivy.resources.requests.memory  }}
+            cpu: {{ default "150Mi" $trivy.resources.requests.cpu  }}
+          limits:
+            memory: {{ default "512Mi" $trivy.resources.limits.memory  }}
+            cpu: {{ default "300m" $trivy.resources.limits.cpu  }}
+      - name: redis
+        image: {{ required "Redis image is not set" $redis.image }}
+        command:
+        - redis-server
+        args:
+        - /etc/redis.conf
+        volumeMounts:
+        - name: redis-config
+          mountPath: /etc/redis.conf
+          subPath: redis.conf
+          readOnly: true
+        ports:
+        - containerPort: 6379
+          name: redis
+        resources:
+          requests:
+            memory: {{ default "256Mi" $redis.resources.requests.memory  }}
+            cpu: {{ default "50m" $redis.resources.requests.cpu  }}
+          limits:
+            memory: {{ default "512Mi" $redis.resources.limits.memory  }}
+            cpu: {{ default "100m" $redis.resources.limits.cpu  }}
+        securityContext:
+        {{- with $redis.securityContext }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if $redis.readinessProbe }}
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 8
+          successThreshold: 1
+          failureThreshold: 10
+        {{- end }}
+        {{- if $redis.livenessProbe }}
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 60
+          successThreshold: 1
+          failureThreshold: 5
+        {{- end }}
+      volumes:
+      - name: redis-config
+        configMap:
+          name: {{ .Release.Name }}-trivy
+          items:
+          - key: redisConfig
+            path: redis.conf
+... 
