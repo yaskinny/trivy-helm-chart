@@ -1,11 +1,11 @@
-# if your internet is slow or probe fails before completing download Trivy database
+# if your internet is slow or probe fails before downloading Trivy database
 # turn of Trivy probes with setting:
 # --set deployment.trivy.livenessProbe="false" --set deployment.trivy.readinessProbe="false" 
 
 # if you have trivy CLI installed on your host
 
   # wait until trivy becomes ready, it depends on your internet
-  kubectl wait po -l app.kubernetes.io/name=trivy --for condition=available --timeout 2m
+  kubectl wait po -n {{ .Release.Namespace }} -l app.kubernetes.io/name=trivy --for condition=available --timeout 2m
 
   # save token
   export token="$(kubectl get secret {{ .Release.Name }}-trivy -n {{ .Release.Namespace }} -o jsonpath='{.data.TRIVY_TOKEN}' | base64 -d )"

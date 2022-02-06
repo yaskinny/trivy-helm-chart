@@ -1,4 +1,4 @@
-{{- if and (.Capabilities.APIVersions.Has "networking.k8s.io/v1") .Values.deployment.trivy.ingress.enabled -}}
+{{- if and (.Capabilities.APIVersions.Has "networking.k8s.io/v1") .Values.deployment.trivy.ingress.enable -}}
 {{- $trivy := .Values.deployment.trivy.ingress -}}
 {{- if $trivy.host }}
 ---
@@ -27,7 +27,7 @@ metadata:
   {{- end }}
 spec:
   ingressClassName: {{ required "You have to specify your ingress class name" $trivy.ingressClassName }}
-  {{- if $trivy.tls.enabled }}
+  {{- if $trivy.tls.enable }}
   tls:
   - hosts:
     - {{ $trivy.host }}

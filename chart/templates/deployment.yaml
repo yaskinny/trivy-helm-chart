@@ -29,10 +29,12 @@ spec:
     rollingUpdate:
       maxSurge: {{ default 1 .Values.deployment.strategy.maxSurge }}
       maxUnavailable: {{ default 0 .Values.deployment.strategy.maxUnavailable }}
-  {{- end }}
-  {{- else if or (eq .Values.deployment.strategy.type "Recreate") (not .Values.deployment.strategy)  }}
+  {{- else if eq .Values.deployment.strategy.type "Recreate" }} 
     type: Recreate
-  {{- end}}
+  {{- end }}
+  {{- else }}
+    type: Recreate
+  {{- end }}
   template:
     metadata:
       labels:
@@ -62,6 +64,17 @@ spec:
         - /trivy
         args:
         - server
+        {{- if $trivy.proxy }}
+        env:
+        {{- if $trivy.proxy.https }}
+        - name: https_proxy
+          value: {{ $trivy.proxy.https | quote }}
+        {{- end }}
+        {{- if $trivy.proxy.http }}
+        - name: http_proxy
+          value: {{ $trivy.proxy.http | quote }}
+        {{- end }}
+        {{- end }}
         envFrom:
         - configMapRef:
             name: {{ .Release.Name }}-trivy

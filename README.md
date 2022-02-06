@@ -10,5 +10,4 @@
 
 
 **TODO:**
-- Add storage for Trivy
 - Add scheduling options

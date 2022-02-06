@@ -1,5 +1,5 @@
 {{- if and (.Capabilities.APIVersions.Has "cilium.io/v2") .Values.networkPolicy.enable -}}
-{{- $np := .Values.networkPolicy.enable -}}
+{{- $np := .Values.networkPolicy -}}
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -7,6 +7,9 @@ metadata:
   namespace: {{ .Release.Namespace }}
   name: trivy
 spec:
+  description: |-
+    - Resolve essential domains for downloading vulnerabilities database
+    - Accept ingress from ingress controller and other allowed endpoints
   endpointSelector:
     matchLabels:
       app.kubernetes.io/name: trivy
@@ -14,18 +17,26 @@ spec:
       {{- toYaml . | nindent 6 }}
     {{- end }}
     {{- include "trivy.commonLabels" .| nindent 6 }}
+  {{- if .Values.deployment.trivy.ingress.enable }}
   ingress:
   - fromEndpoints:
     - matchLabels:
-        {{- if .Values.deployment.trivy.ingress.enable }}
-        k8s:io.kubernetes.pod.namespace: "{{ .Values.deployment.trivy.ingress.ingressClassName }}"
-        {{- with $np.extraLabelsForIngress }}
-          {{- toYaml . | nindent 10 }}
+        k8s:io.kubernetes.pod.namespace: "{{ $np.ingressController.namespace }}"
+        {{- with $np.ingressController.extraLabelsForIngress }}
+          {{- toYaml . | nindent 8 }}
         {{- end }}
+    {{- range $np.allowIngress }}
+    - matchLabels:
+        {{- if .namespace }}
+        k8s:io.kubernetes.pod.namespace: {{ .namespace | quote }}
         {{- end }}
+        {{- with .extraLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    {{- end }}
     toPorts:
     - ports:
-      - port: {{ default 4954 .Values.deployment.trivy.service.port  | quote}}
+      - port: {{ default 4954 .Values.deployment.trivy.service.port  | quote }}
         protocol: TCP
   - fromCIDR:
     - 127.0.0.1/8
@@ -33,6 +44,7 @@ spec:
     - ports: 
       - port: "6379"
         protocol: TCP
+  {{- end }}
   egress:
   - toPorts:
     - ports: 

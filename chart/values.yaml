@@ -5,6 +5,7 @@ labels: {}
 # global annotations
 annotations: {}
 
+
 serviceAccountName: trivy
 
 imagePullSecrets: []
@@ -13,9 +14,11 @@ imagePullSecrets: []
 deployment:
   replicas: 1
   # labels to add for matchLabels
-  selectorLabels: {}
+  selectorLabels:
+    app.kubernetes.io/part-of: staging
+
   strategy:
-    type: RollingUpdate
+    type: Recreate
     maxSurge: 1
     maxUnavailable: 0
 
@@ -46,13 +49,18 @@ deployment:
     image: redis:bullseye@sha256:0d9c9aed1eb385336db0bc9b976b6b49774aee3d2b9c2788a0d0d9e239986cb3
 
   trivy:
+    # proxy:
+    #   http: http://squid.proxy.svc.cluster.local:3128
+    #   https: http://squid.proxy.svc.cluster.local:3128
+
     ingress:
-      enabled: true
+      enable: true
       tls:
-        enable: false
+        enable: true
         secretName: trivy-tls
       ingressClassName: nginx
-      annotations: {}
+      annotations:
+        cert-manager.io/cluster-issuer: self
       labels: {}
       host: trivy.yaser.linux
     service:
@@ -61,8 +69,11 @@ deployment:
       #type: NodePort
       #nodePort: 300025
 
+    # Trivy authentication token and token header name
+    # by default a random token will get generated.
     #token: secret123
-    #tokenName: x-token
+    #tokenName: trivy-token
+
     image: yaskinny/trivy:0.23.0@sha256:e5daab9097ca3fdd3c4123a747571c6d78e77988ff76bfa585f2326564194e12
     securityContext:
       privileged: false
@@ -83,7 +94,14 @@ deployment:
         memory: 512Mi
         cpu: 350m
 networkPolicy:
+  allowIngress:
+  - namespace: cicd
+    extraLabels:
+      app.kubernetes.io/part-of: cicd
   enable: true
-  extraLabelsForIngress:
-    app.kubernetes.io/component: controller
+  ingressController:
+    # namespace which your ingress controller is deployed
+    namespace: ingress-nginx
+    extraLabelsForIngress:
+      app.kubernetes.io/component: controller
 ...
